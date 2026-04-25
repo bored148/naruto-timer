@@ -3,269 +3,116 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>替身术自动追踪·可记忆版</title>
+    <title>替身悬浮</title>
     <style>
         * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; user-select:none; }
-        body { background:#111; font-family:system-ui,sans-serif; height:100vh; width:100vw; overflow:hidden; position:fixed; }
-        .panel {
-            position:absolute; top:10px; left:10px; background:rgba(20,20,35,0.82); backdrop-filter:blur(8px);
-            border-radius:24px; padding:10px 14px; display:flex; flex-direction:column; gap:8px;
-            box-shadow:0 8px 24px rgba(0,0,0,0.7); border:1px solid rgba(255,255,255,0.15); z-index:9999;
-            max-width:330px; touch-action:none;
+        body { background:transparent; overflow:hidden; height:100vh; width:100vw; position:fixed; }
+        /* 悬浮数字容器 */
+        .float-container {
+            position:absolute; display:flex; gap:12px; align-items:center;
+            z-index:9999; touch-action:none;
         }
-        .drag-bar { width:100%; height:16px; background:rgba(255,255,255,0.1); border-radius:10px; margin-bottom:4px; display:flex; align-items:center; justify-content:center; color:rgba(255,255,255,0.5); font-size:0.6rem; }
-        .row { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
-        .timer-block { text-align:center; min-width:55px; }
-        .label { font-size:0.7rem; color:#aaa; } 
-        .time { font-weight:700; font-size:2.8rem; line-height:1; }
-        .enemy { color:#ff8787; } .self { color:#74c0fc; }
-        .urgent { color:#f03 !important; animation:pulse 0.5s infinite; }
+        .timer-digit {
+            font-weight:700; font-size:2.8rem; line-height:1;
+            color:rgba(255,255,255,0.85); text-shadow:0 2px 8px rgba(0,0,0,0.7);
+            padding:2px 8px; border-radius:12px; background:rgba(0,0,0,0.35);
+            backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px);
+            letter-spacing:1px; font-variant-numeric:tabular-nums;
+            white-space:nowrap;
+        }
+        .enemy-digit { color:#ff8787; }
+        .self-digit { color:#74c0fc; }
+        .urgent { animation:pulse 0.5s infinite; }
         @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
-        .chakra-box { background:rgba(255,255,255,0.06); border-radius:16px; padding:6px 12px; display:flex; align-items:center; gap:10px; }
-        .chakra-num { font-size:1.4rem; font-weight:700; color:#ffd43b; }
-        button {
-            background:rgba(255,255,255,0.12); border:1px solid rgba(255,255,255,0.2); color:#fff; padding:6px 12px; border-radius:16px;
-            font-size:0.75rem; font-weight:600; backdrop-filter:blur(4px); transition:0.2s; white-space:nowrap;
+        /* 设置面板（默认隐藏） */
+        .settings-panel {
+            position:absolute; bottom:20px; left:50%; transform:translateX(-50%);
+            background:rgba(20,20,35,0.9); backdrop-filter:blur(10px);
+            border-radius:20px; padding:12px 14px; display:none; flex-direction:column; gap:8px;
+            z-index:10000; min-width:280px; max-width:90vw;
+            box-shadow:0 8px 24px rgba(0,0,0,0.6); border:1px solid rgba(255,255,255,0.2);
         }
-        button:active { background:rgba(255,255,255,0.3); transform:scale(0.95); }
-        button.danger { background:rgba(255,90,90,0.25); border-color:#f55; }
-        button.safe { background:rgba(70,150,255,0.25); border-color:#68f; }
+        .settings-panel.show { display:flex; }
+        .row { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+        button {
+            background:rgba(255,255,255,0.15); border:1px solid rgba(255,255,255,0.25); color:#fff;
+            padding:6px 12px; border-radius:14px; font-size:0.75rem; font-weight:600;
+            backdrop-filter:blur(4px); transition:0.2s; white-space:nowrap;
+        }
+        button:active { background:rgba(255,255,255,0.3); transform:scale(0.96); }
         button.warn { background:rgba(255,200,0,0.2); border-color:#fd0; color:#fd0; }
-        button.small { padding:4px 10px; font-size:0.7rem; }
-        .init-row { font-size:0.7rem; color:#aaa; gap:6px; }
-        .init-row input { width:40px; background:rgba(255,255,255,0.1); border:1px solid rgba(255,255,255,0.2); border-radius:10px; color:#fff; text-align:center; padding:3px; }
-        .size-ctrl { display:flex; align-items:center; gap:6px; color:#ccc; font-size:0.7rem; }
-        .size-btn { width:26px; height:26px; border-radius:50%; background:rgba(255,255,255,0.2); border:none; color:#fff; display:flex; align-items:center; justify-content:center; }
-        .auto-section { margin-top:4px; border-top:1px solid rgba(255,255,255,0.1); padding-top:6px; }
-        .capture-video { width:100%; height:auto; max-height:150px; background:#000; border-radius:12px; position:relative; overflow:hidden; margin-top:4px; }
-        .selection-box { position:absolute; border:2px solid #0f0; box-shadow:0 0 8px #0f0; touch-action:none; }
-        .hidden { display:none; }
+        button.danger { background:rgba(255,90,90,0.25); border-color:#f55; }
+        input, select { background:rgba(255,255,255,0.1); border:1px solid rgba(255,255,255,0.2); border-radius:10px; color:#fff; padding:4px 8px; font-size:0.8rem; text-align:center; }
+        .capture-video { width:100%; max-height:120px; background:#000; border-radius:12px; position:relative; overflow:hidden; margin-top:4px; }
+        .selection-box { position:absolute; border:2px solid #0f0; box-shadow:0 0 8px #0f0; }
+        label { font-size:0.7rem; color:#ccc; display:flex; align-items:center; gap:4px; }
     </style>
 </head>
 <body>
-<div class="panel" id="panel">
-    <div class="drag-bar" id="dragHandle">⋮⋮ 拖动面板 ⋮⋮</div>
-    <div class="row">
-        <div class="timer-block enemy"><div class="label">敌替身</div><div class="time" id="enemyTime">15</div></div>
-        <div class="timer-block self"><div class="label">我替身</div><div class="time" id="selfTime">15</div></div>
+    <!-- 极简悬浮数字 -->
+    <div class="float-container" id="floatContainer">
+        <div class="timer-digit enemy-digit" id="enemyDigit">敌:15</div>
+        <div class="timer-digit self-digit" id="selfDigit">我:15</div>
     </div>
-    <div class="chakra-box">
-        <span style="font-size:0.8rem;">敌方奥义点</span>
-        <span class="chakra-num" id="chakraCount">2</span>
-        <button class="warn small" id="chakraMinusOther">−其他</button>
-        <button class="small" id="chakraPlus">+1</button>
-    </div>
-    <div class="row">
-        <button class="danger" id="enemySubBtn">敌替身</button>
-        <button class="safe" id="selfBtn">我替身</button>
-        <button id="resetAll">重置</button>
-    </div>
-    <div class="init-row">
-        <span>开局豆</span>
-        <input type="number" id="initChakra" value="2" min="0" max="4">
-        <button class="small" id="applyInit">设定</button>
-    </div>
-    <div class="size-ctrl">
-        <button class="size-btn" id="sizeDown">−</button><span>字号</span>
-        <button class="size-btn" id="sizeUp">＋</button>
-    </div>
-    <!-- 自动检测区域 -->
-    <div class="auto-section">
-        <button id="toggleAutoBtn" style="width:100%; margin-bottom:4px;">⚡ 展开自动检测</button>
-        <div id="autoPanel" class="hidden">
+
+    <!-- 隐藏设置面板 -->
+    <div class="settings-panel" id="settingsPanel">
+        <div style="text-align:center; font-weight:600; color:#fff; font-size:0.9rem;">⚙️ 设置 (双击数字关闭)</div>
+        <div class="row">
+            <span style="font-size:0.8rem; color:#aaa;">开局豆</span>
+            <input type="number" id="initChakraInput" value="2" min="0" max="4" style="width:50px;">
+            <button id="applyInitBtn">设定</button>
+        </div>
+        <div class="row">
+            <span style="font-size:0.8rem; color:#aaa;">字号</span>
+            <button id="sizeDownBtn">−</button>
+            <span id="fontSizeDisplay" style="color:#fff; font-size:0.8rem;">2.8</span>
+            <button id="sizeUpBtn">＋</button>
+        </div>
+        <!-- 自动检测相关 -->
+        <button id="toggleAutoBtn">📺 展开自动检测</button>
+        <div id="autoPanel" style="display:none; flex-direction:column; gap:6px;">
             <button id="startCaptureBtn">📺 开始捕获</button>
             <button id="stopCaptureBtn" class="hidden">⏹️ 停止捕获</button>
             <div class="capture-video" id="videoContainer">
                 <video id="screenVideo" autoplay muted playsinline style="width:100%; height:100%; object-fit:contain;"></video>
-                <div class="selection-box" id="selBox" style="width:24px; height:24px; left:20px; top:20px;"></div>
+                <div class="selection-box" id="selBox" style="width:24px; height:24px; left:10px; top:10px;"></div>
             </div>
-            <div class="row" style="margin-top:4px;">
-                <button id="sampleOn">🎯 采样有豆</button>
-                <button id="sampleOff">⚫ 采样无豆</button>
-                <button class="small" id="boxSizeUp">＋框</button>
-                <button class="small" id="boxSizeDown">－框</button>
+            <div class="row">
+                <button id="sampleOnBtn">🎯 有豆</button>
+                <button id="sampleOffBtn">⚫ 无豆</button>
+                <button class="small" id="boxSizeUpBtn">＋框</button>
+                <button class="small" id="boxSizeDownBtn">－框</button>
             </div>
-            <div style="font-size:0.7rem; color:#ccc; margin-top:2px;">
-                <span id="detectStatus">⚪ 等待样本</span>
-                <label style="margin-left:8px;"><input type="checkbox" id="autoTriggerCheck"> 自动触发</label>
+            <div style="display:flex; align-items:center; gap:8px; font-size:0.7rem; color:#ccc;">
+                <span id="detectStatus">⚪ 未就绪</span>
+                <label><input type="checkbox" id="autoTriggerCheck"> 自动触发</label>
             </div>
         </div>
+        <button id="resetChakraBtn" class="warn">重置豆为开局值</button>
     </div>
-</div>
 
 <script>
 (function() {
-    // ---------- 持久化存储 ----------
-    const STORAGE_KEY = 'naruto_timer_settings';
-    function saveSettings() {
-        const settings = {
-            initChakra: parseInt(document.getElementById('initChakra').value) || 2,
-            fontSize: fontSize,
-            panelLeft: panel.style.left,
-            panelTop: panel.style.top,
-            autoPanelOpen: !autoPanel.classList.contains('hidden'),
-            autoTrigger: autoTriggerCheck.checked,
-            selX: selX,
-            selY: selY,
-            selW: selW,
-            selH: selH,
-            sampleOn: sampleOnColor,
-            sampleOff: sampleOffColor
-        };
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
-    }
-
-    function loadSettings() {
-        const saved = localStorage.getItem(STORAGE_KEY);
-        if (!saved) return false;
-        try {
-            const s = JSON.parse(saved);
-            // 应用基本设置
-            document.getElementById('initChakra').value = s.initChakra || 2;
-            enemyChakra = s.initChakra || 2;
-            fontSize = s.fontSize || 2.8;
-            if (s.panelLeft) panel.style.left = s.panelLeft;
-            if (s.panelTop) panel.style.top = s.panelTop;
-            if (s.autoPanelOpen) autoPanel.classList.remove('hidden');
-            else autoPanel.classList.add('hidden');
-            autoTriggerCheck.checked = s.autoTrigger || false;
-            selX = s.selX || 20;
-            selY = s.selY || 20;
-            selW = s.selW || 24;
-            selH = s.selH || 24;
-            sampleOnColor = s.sampleOn || null;
-            sampleOffColor = s.sampleOff || null;
-            updateSelBox();
-            updateChakraDisplay();
-            updateTimers();
-            applyFontSize();
-            if (sampleOnColor) detectStatusSpan.textContent = '🟢 已加载有豆样本';
-            if (sampleOffColor) detectStatusSpan.textContent = '⚫ 已加载无豆样本';
-            return true;
-        } catch (e) {
-            return false;
-        }
-    }
-
-    // 监听变化自动保存（节流）
-    let saveTimeout;
-    function autoSave() {
-        clearTimeout(saveTimeout);
-        saveTimeout = setTimeout(saveSettings, 300);
-    }
-
-    // ---------- 手动计时与奥义点 ----------
+    // ---------- 核心状态 ----------
     const CD = 15;
-    let enemyInterval = null, selfInterval = null;
     let enemyRemaining = CD, selfRemaining = CD;
     let enemyChakra = 2;
+    let initChakraVal = 2;
+    let enemyInterval = null, selfInterval = null;
 
-    const enemyTimeEl = document.getElementById('enemyTime');
-    const selfTimeEl = document.getElementById('selfTime');
-    const chakraCountEl = document.getElementById('chakraCount');
-    const enemySubBtn = document.getElementById('enemySubBtn');
-    const selfBtn = document.getElementById('selfBtn');
-    const resetAllBtn = document.getElementById('resetAll');
-    const chakraMinusOther = document.getElementById('chakraMinusOther');
-    const chakraPlus = document.getElementById('chakraPlus');
-    const initChakraInput = document.getElementById('initChakra');
-    const applyInitBtn = document.getElementById('applyInit');
-    const sizeDownBtn = document.getElementById('sizeDown');
-    const sizeUpBtn = document.getElementById('sizeUp');
+    // DOM 元素
+    const enemyDigit = document.getElementById('enemyDigit');
+    const selfDigit = document.getElementById('selfDigit');
+    const floatContainer = document.getElementById('floatContainer');
+    const settingsPanel = document.getElementById('settingsPanel');
 
-    function updateTimers() {
-        enemyTimeEl.textContent = enemyRemaining;
-        selfTimeEl.textContent = selfRemaining;
-        enemyTimeEl.classList.toggle('urgent', enemyRemaining <= 3 && enemyRemaining > 0);
-        selfTimeEl.classList.toggle('urgent', selfRemaining <= 3 && selfRemaining > 0);
-    }
-    function updateChakraDisplay() {
-        chakraCountEl.textContent = enemyChakra;
-        enemySubBtn.disabled = enemyChakra <= 0;
-        enemySubBtn.style.opacity = enemyChakra <= 0 ? '0.5' : '1';
-    }
-    function stopEnemyTimer() { if(enemyInterval) clearInterval(enemyInterval); enemyInterval=null; }
-    function stopSelfTimer() { if(selfInterval) clearInterval(selfInterval); selfInterval=null; }
-    function startEnemyCD() {
-        stopEnemyTimer(); enemyRemaining=CD; updateTimers();
-        enemyInterval = setInterval(() => {
-            enemyRemaining--;
-            updateTimers();
-            if(enemyRemaining<=0) { stopEnemyTimer(); enemyRemaining=0; updateTimers(); if(navigator.vibrate) navigator.vibrate(50); }
-        }, 1000);
-        if(navigator.vibrate) navigator.vibrate(30);
-    }
-    function startSelfCD() {
-        stopSelfTimer(); selfRemaining=CD; updateTimers();
-        selfInterval = setInterval(() => {
-            selfRemaining--;
-            updateTimers();
-            if(selfRemaining<=0) { stopSelfTimer(); selfRemaining=0; updateTimers(); if(navigator.vibrate) navigator.vibrate(50); }
-        }, 1000);
-        if(navigator.vibrate) navigator.vibrate(30);
-    }
-    function enemyUseSubstitution() {
-        if(enemyChakra<=0) return;
-        enemyChakra--; updateChakraDisplay(); startEnemyCD();
-        autoSave();
-    }
-    function enemyUseOther() { if(enemyChakra<=0) return; enemyChakra--; updateChakraDisplay(); autoSave(); }
-    function addChakra() { if(enemyChakra<4) enemyChakra++; updateChakraDisplay(); autoSave(); }
-    function setInitChakra() {
-        let v = parseInt(initChakraInput.value); if(isNaN(v)) v=2;
-        v = Math.min(4, Math.max(0, v)); enemyChakra=v; initChakraInput.value=v; updateChakraDisplay();
-        autoSave();
-    }
-    function resetAll() {
-        stopEnemyTimer(); stopSelfTimer(); enemyRemaining=CD; selfRemaining=CD; updateTimers();
-    }
-
-    // 事件绑定
-    enemySubBtn.addEventListener('click', enemyUseSubstitution);
-    chakraMinusOther.addEventListener('click', enemyUseOther);
-    chakraPlus.addEventListener('click', addChakra);
-    selfBtn.addEventListener('click', startSelfCD);
-    resetAllBtn.addEventListener('click', resetAll);
-    applyInitBtn.addEventListener('click', setInitChakra);
-    initChakraInput.addEventListener('change', setInitChakra);
-    initChakraInput.addEventListener('input', autoSave); // 自动保存输入
-
-    // 字号调节
-    let fontSize = 2.8;
-    function applyFontSize() { enemyTimeEl.style.fontSize = fontSize+'rem'; selfTimeEl.style.fontSize = fontSize+'rem'; }
-    sizeUpBtn.addEventListener('click', ()=>{ if(fontSize<4.5) fontSize+=0.3; applyFontSize(); autoSave(); });
-    sizeDownBtn.addEventListener('click', ()=>{ if(fontSize>1.8) fontSize-=0.3; applyFontSize(); autoSave(); });
-
-    // 面板拖动 + 自动保存
-    const panel = document.getElementById('panel');
-    const dragHandle = document.getElementById('dragHandle');
-    let isDragging=false, startX,startY, initLeft,initTop;
-    function onDragStart(e) {
-        if(!e.target.closest('#dragHandle')) return; e.preventDefault();
-        const t = e.touches?e.touches[0]:e;
-        startX=t.clientX; startY=t.clientY;
-        const r=panel.getBoundingClientRect(); initLeft=r.left; initTop=r.top;
-        isDragging=true; panel.style.transition='none';
-    }
-    function onDragMove(e) {
-        if(!isDragging) return; e.preventDefault();
-        const t=e.touches?e.touches[0]:e;
-        let nl=initLeft + t.clientX-startX, nt=initTop + t.clientY-startY;
-        nl=Math.max(0, Math.min(nl, window.innerWidth-panel.offsetWidth));
-        nt=Math.max(0, Math.min(nt, window.innerHeight-panel.offsetHeight));
-        panel.style.left=nl+'px'; panel.style.top=nt+'px';
-    }
-    function onDragEnd() { isDragging=false; panel.style.transition=''; autoSave(); /* 拖完保存位置 */ }
-    dragHandle.addEventListener('touchstart', onDragStart, {passive:false});
-    dragHandle.addEventListener('mousedown', onDragStart);
-    window.addEventListener('touchmove', onDragMove, {passive:false});
-    window.addEventListener('mousemove', onDragMove);
-    window.addEventListener('touchend', onDragEnd);
-    window.addEventListener('mouseup', onDragEnd);
-
-    panel.addEventListener('touchstart', e => { if(!e.target.closest('button') && !e.target.closest('input')) e.preventDefault(); }, {passive:false});
-
-    // ---------- 自动屏幕检测模块 ----------
+    // 设置面板元素
+    const initChakraInput = document.getElementById('initChakraInput');
+    const applyInitBtn = document.getElementById('applyInitBtn');
+    const sizeDownBtn = document.getElementById('sizeDownBtn');
+    const sizeUpBtn = document.getElementById('sizeUpBtn');
+    const fontSizeDisplay = document.getElementById('fontSizeDisplay');
     const toggleAutoBtn = document.getElementById('toggleAutoBtn');
     const autoPanel = document.getElementById('autoPanel');
     const startCaptureBtn = document.getElementById('startCaptureBtn');
@@ -273,22 +120,242 @@
     const videoContainer = document.getElementById('videoContainer');
     const screenVideo = document.getElementById('screenVideo');
     const selBox = document.getElementById('selBox');
-    const sampleOnBtn = document.getElementById('sampleOn');
-    const sampleOffBtn = document.getElementById('sampleOff');
-    const boxSizeUpBtn = document.getElementById('boxSizeUp');
-    const boxSizeDownBtn = document.getElementById('boxSizeDown');
+    const sampleOnBtn = document.getElementById('sampleOnBtn');
+    const sampleOffBtn = document.getElementById('sampleOffBtn');
+    const boxSizeUpBtn = document.getElementById('boxSizeUpBtn');
+    const boxSizeDownBtn = document.getElementById('boxSizeDownBtn');
     const detectStatusSpan = document.getElementById('detectStatus');
     const autoTriggerCheck = document.getElementById('autoTriggerCheck');
+    const resetChakraBtn = document.getElementById('resetChakraBtn');
 
+    // 字号
+    let fontSize = 2.8;
+
+    // ---------- 持久化 ----------
+    const STORAGE_KEY = 'naruto_float_timer';
+    function saveSettings() {
+        const data = {
+            initChakra: initChakraVal,
+            fontSize: fontSize,
+            floatLeft: floatContainer.style.left,
+            floatTop: floatContainer.style.top,
+            autoTrigger: autoTriggerCheck.checked,
+            selX, selY, selW, selH,
+            sampleOn: sampleOnColor,
+            sampleOff: sampleOffColor
+        };
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    }
+    function loadSettings() {
+        const saved = localStorage.getItem(STORAGE_KEY);
+        if (!saved) return;
+        try {
+            const d = JSON.parse(saved);
+            initChakraVal = d.initChakra || 2;
+            fontSize = d.fontSize || 2.8;
+            if (d.floatLeft) floatContainer.style.left = d.floatLeft;
+            if (d.floatTop) floatContainer.style.top = d.floatTop;
+            autoTriggerCheck.checked = d.autoTrigger || false;
+            selX = d.selX || 10;
+            selY = d.selY || 10;
+            selW = d.selW || 24;
+            selH = d.selH || 24;
+            sampleOnColor = d.sampleOn || null;
+            sampleOffColor = d.sampleOff || null;
+            enemyChakra = initChakraVal;
+            initChakraInput.value = initChakraVal;
+            updateSelBox();
+            applyFontSize();
+            updateDigitDisplay();
+            if (sampleOnColor) detectStatusSpan.textContent = '🟢 有豆样本';
+            if (sampleOffColor) detectStatusSpan.textContent = '⚫ 无豆样本';
+        } catch(e) {}
+    }
+
+    // ---------- 倒计时显示更新 ----------
+    function updateDigitDisplay() {
+        enemyDigit.textContent = '敌:' + enemyRemaining;
+        selfDigit.textContent = '我:' + selfRemaining;
+        enemyDigit.classList.toggle('urgent', enemyRemaining <= 3 && enemyRemaining > 0);
+        selfDigit.classList.toggle('urgent', selfRemaining <= 3 && selfRemaining > 0);
+    }
+
+    function applyFontSize() {
+        enemyDigit.style.fontSize = fontSize + 'rem';
+        selfDigit.style.fontSize = fontSize + 'rem';
+        fontSizeDisplay.textContent = fontSize.toFixed(1);
+    }
+
+    function stopEnemyTimer() { if(enemyInterval) clearInterval(enemyInterval); enemyInterval=null; }
+    function stopSelfTimer() { if(selfInterval) clearInterval(selfInterval); selfInterval=null; }
+
+    function startEnemyCD() {
+        stopEnemyTimer();
+        enemyRemaining = CD;
+        updateDigitDisplay();
+        enemyInterval = setInterval(() => {
+            enemyRemaining--;
+            updateDigitDisplay();
+            if (enemyRemaining <= 0) {
+                stopEnemyTimer();
+                enemyRemaining = 0;
+                updateDigitDisplay();
+                if (navigator.vibrate) navigator.vibrate(50);
+            }
+        }, 1000);
+        if (navigator.vibrate) navigator.vibrate(30);
+    }
+
+    function startSelfCD() {
+        stopSelfTimer();
+        selfRemaining = CD;
+        updateDigitDisplay();
+        selfInterval = setInterval(() => {
+            selfRemaining--;
+            updateDigitDisplay();
+            if (selfRemaining <= 0) {
+                stopSelfTimer();
+                selfRemaining = 0;
+                updateDigitDisplay();
+                if (navigator.vibrate) navigator.vibrate(50);
+            }
+        }, 1000);
+        if (navigator.vibrate) navigator.vibrate(30);
+    }
+
+    // 替身消耗逻辑
+    function enemyUseSubstitution() {
+        if (enemyChakra <= 0) return;
+        enemyChakra--;
+        startEnemyCD();
+        saveSettings(); // 保存当前豆数状态（但这里仅保存设置，豆数不持久化，因为游戏每次不一样）
+    }
+    // 手动触发（长按或通过自动检测）
+    function manualEnemySub() {
+        enemyUseSubstitution();
+    }
+
+    // 重置奥义点到开局值
+    function resetChakra() {
+        enemyChakra = initChakraVal;
+        // 不重置计时
+    }
+
+    // ---------- 悬浮拖动 ----------
+    let dragging = false;
+    let dragStartX, dragStartY, origLeft, origTop;
+
+    floatContainer.addEventListener('touchstart', (e) => {
+        // 只允许从容器本身拖动，不要点到数字触发双击
+        if (e.target === floatContainer || e.target.classList.contains('timer-digit')) {
+            dragging = true;
+            const touch = e.touches[0];
+            dragStartX = touch.clientX;
+            dragStartY = touch.clientY;
+            const rect = floatContainer.getBoundingClientRect();
+            origLeft = rect.left;
+            origTop = rect.top;
+            floatContainer.style.transition = 'none';
+            e.preventDefault();
+        }
+    }, {passive: false});
+
+    window.addEventListener('touchmove', (e) => {
+        if (!dragging) return;
+        e.preventDefault();
+        const touch = e.touches[0];
+        let newLeft = origLeft + touch.clientX - dragStartX;
+        let newTop = origTop + touch.clientY - dragStartY;
+        // 边界限制
+        const w = floatContainer.offsetWidth;
+        const h = floatContainer.offsetHeight;
+        newLeft = Math.max(0, Math.min(newLeft, window.innerWidth - w));
+        newTop = Math.max(0, Math.min(newTop, window.innerHeight - h));
+        floatContainer.style.left = newLeft + 'px';
+        floatContainer.style.top = newTop + 'px';
+    });
+    window.addEventListener('touchend', () => {
+        if (dragging) {
+            dragging = false;
+            floatContainer.style.transition = '';
+            saveSettings(); // 拖完保存位置
+        }
+    });
+
+    // 双击数字打开设置
+    let lastTapTime = 0;
+    enemyDigit.addEventListener('click', (e) => {
+        const now = Date.now();
+        if (now - lastTapTime < 300) {
+            // 双击
+            settingsPanel.classList.toggle('show');
+            e.stopPropagation();
+        }
+        lastTapTime = now;
+    });
+    selfDigit.addEventListener('click', (e) => {
+        const now = Date.now();
+        if (now - lastTapTime < 300) {
+            settingsPanel.classList.toggle('show');
+            e.stopPropagation();
+        }
+        lastTapTime = now;
+    });
+    // 点击面板外部关闭
+    document.addEventListener('click', (e) => {
+        if (!settingsPanel.contains(e.target) && e.target !== enemyDigit && e.target !== selfDigit) {
+            settingsPanel.classList.remove('show');
+        }
+    });
+
+    // 长按敌替身数字触发手动替身（2秒）
+    let longPressTimer;
+    enemyDigit.addEventListener('touchstart', (e) => {
+        longPressTimer = setTimeout(() => {
+            manualEnemySub();
+            if (navigator.vibrate) navigator.vibrate(15);
+        }, 800);
+    });
+    enemyDigit.addEventListener('touchend', () => clearTimeout(longPressTimer));
+    enemyDigit.addEventListener('touchmove', () => clearTimeout(longPressTimer));
+
+    // 设置面板内的功能
+    applyInitBtn.addEventListener('click', () => {
+        initChakraVal = parseInt(initChakraInput.value) || 2;
+        initChakraVal = Math.min(4, Math.max(0, initChakraVal));
+        enemyChakra = initChakraVal;
+        initChakraInput.value = initChakraVal;
+        saveSettings();
+    });
+    initChakraInput.addEventListener('change', () => {
+        initChakraVal = parseInt(initChakraInput.value) || 2;
+        initChakraVal = Math.min(4, Math.max(0, initChakraVal));
+        enemyChakra = initChakraVal;
+        saveSettings();
+    });
+
+    sizeUpBtn.addEventListener('click', () => { if(fontSize<4.5) fontSize+=0.3; applyFontSize(); saveSettings(); });
+    sizeDownBtn.addEventListener('click', () => { if(fontSize>1.8) fontSize-=0.3; applyFontSize(); saveSettings(); });
+
+    resetChakraBtn.addEventListener('click', () => { resetChakra(); });
+
+    // 自动检测开关展开
+    toggleAutoBtn.addEventListener('click', () => {
+        if (autoPanel.style.display === 'none') {
+            autoPanel.style.display = 'flex';
+            toggleAutoBtn.textContent = '📺 收起自动检测';
+        } else {
+            autoPanel.style.display = 'none';
+            toggleAutoBtn.textContent = '📺 展开自动检测';
+        }
+    });
+
+    // ---------- 屏幕检测（照旧）----------
     let mediaStream = null;
-    let sampleOnColor = null;   // {r,g,b}
-    let sampleOffColor = null;
-    let lastState = null;
-    let triggerCooldown = false;
-    const DETECT_INTERVAL = 200;
+    let sampleOnColor = null, sampleOffColor = null;
+    let lastState = null, consecutiveOff = 0, triggerCooldown = false;
     let detectTimer = null;
-
-    let selX = 20, selY = 20, selW = 24, selH = 24;
+    let selX = 10, selY = 10, selW = 24, selH = 24;
 
     function updateSelBox() {
         selBox.style.left = selX + 'px';
@@ -297,30 +364,28 @@
         selBox.style.height = selH + 'px';
     }
 
-    // 选框拖动
-    let selDragging = false, selStartX, selStartY, origX, origY;
+    // 选框拖动 (简化)
     selBox.addEventListener('touchstart', e => {
         e.stopPropagation(); e.preventDefault();
         const t = e.touches[0];
-        selStartX = t.clientX; selStartY = t.clientY;
-        origX = selX; origY = selY;
-        selDragging = true;
+        let startX = t.clientX, startY = t.clientY;
+        let origSelX = selX, origSelY = selY;
+        function onMove(ev) {
+            const mt = ev.touches[0];
+            selX = Math.max(0, Math.min(origSelX + mt.clientX - startX, videoContainer.clientWidth - selW));
+            selY = Math.max(0, Math.min(origSelY + mt.clientY - startY, videoContainer.clientHeight - selH));
+            updateSelBox();
+        }
+        function onEnd() {
+            window.removeEventListener('touchmove', onMove);
+            window.removeEventListener('touchend', onEnd);
+            saveSettings();
+        }
+        window.addEventListener('touchmove', onMove);
+        window.addEventListener('touchend', onEnd);
     });
-    window.addEventListener('touchmove', e => {
-        if(!selDragging) return;
-        e.preventDefault();
-        const t = e.touches[0];
-        let dx = t.clientX - selStartX, dy = t.clientY - selStartY;
-        selX = Math.max(0, Math.min(origX + dx, videoContainer.clientWidth - selW));
-        selY = Math.max(0, Math.min(origY + dy, videoContainer.clientHeight - selH));
-        updateSelBox();
-    });
-    window.addEventListener('touchend', () => { 
-        if(selDragging) autoSave(); 
-        selDragging = false; 
-    });
-    boxSizeUpBtn.addEventListener('click', ()=>{ selW+=4; selH+=4; updateSelBox(); autoSave(); });
-    boxSizeDownBtn.addEventListener('click', ()=>{ if(selW>10){ selW-=4; selH-=4; updateSelBox(); autoSave(); } });
+    boxSizeUpBtn.addEventListener('click', ()=>{ selW+=4; selH+=4; updateSelBox(); saveSettings(); });
+    boxSizeDownBtn.addEventListener('click', ()=>{ if(selW>10){ selW-=4; selH-=4; updateSelBox(); saveSettings(); } });
 
     function captureAverageColor() {
         if (!mediaStream || screenVideo.readyState < 2) return null;
@@ -332,124 +397,99 @@
         const videoRect = screenVideo.getBoundingClientRect();
         const scaleX = canvas.width / videoRect.width;
         const scaleY = canvas.height / videoRect.height;
-        const sx = Math.floor(selX * scaleX);
-        const sy = Math.floor(selY * scaleY);
-        const sw = Math.floor(selW * scaleX);
-        const sh = Math.floor(selH * scaleY);
-        if (sw <= 0 || sh <= 0) return null;
-        const imageData = ctx.getImageData(sx, sy, sw, sh);
-        const data = imageData.data;
-        let r=0, g=0, b=0, count=0;
-        for (let i=0; i<data.length; i+=4) {
-            r += data[i]; g += data[i+1]; b += data[i+2]; count++;
-        }
-        if (count === 0) return null;
-        return { r: Math.round(r/count), g: Math.round(g/count), b: Math.round(b/count) };
+        const sx = Math.floor(selX * scaleX), sy = Math.floor(selY * scaleY);
+        const sw = Math.floor(selW * scaleX), sh = Math.floor(selH * scaleY);
+        if (sw<=0 || sh<=0) return null;
+        const imgData = ctx.getImageData(sx, sy, sw, sh);
+        const data = imgData.data;
+        let r=0,g=0,b=0, cnt=0;
+        for(let i=0;i<data.length;i+=4){ r+=data[i]; g+=data[i+1]; b+=data[i+2]; cnt++; }
+        if(cnt===0) return null;
+        return {r:Math.round(r/cnt), g:Math.round(g/cnt), b:Math.round(b/cnt)};
     }
 
-    function colorDistance(c1, c2) {
-        if (!c1 || !c2) return 999;
-        return Math.sqrt((c1.r-c2.r)**2 + (c1.g-c2.g)**2 + (c1.b-c2.b)**2);
+    function colorDistance(c1,c2){
+        if(!c1||!c2) return 999;
+        return Math.sqrt((c1.r-c2.r)**2+(c1.g-c2.g)**2+(c1.b-c2.b)**2);
     }
 
-    function classifyColor(avgColor) {
-        const distOn = sampleOnColor ? colorDistance(avgColor, sampleOnColor) : 999;
-        const distOff = sampleOffColor ? colorDistance(avgColor, sampleOffColor) : 999;
-        const threshold = 25;
-        if (distOn <= threshold) return 'on';
-        if (distOff <= threshold) return 'off';
+    function classifyColor(avg){
+        const dOn = sampleOnColor ? colorDistance(avg, sampleOnColor) : 999;
+        const dOff = sampleOffColor ? colorDistance(avg, sampleOffColor) : 999;
+        if(dOn<=25) return 'on';
+        if(dOff<=25) return 'off';
         return 'unknown';
     }
 
-    let consecutiveOff = 0;
-    function detectFrame() {
+    function detectFrame(){
         const avg = captureAverageColor();
-        if (!avg) return;
+        if(!avg) return;
         const state = classifyColor(avg);
-        if (state === 'on') {
-            consecutiveOff = 0;
-            detectStatusSpan.textContent = '🟢 有豆状态';
-        } else if (state === 'off') {
+        if(state==='on'){ consecutiveOff=0; detectStatusSpan.textContent='🟢 有豆'; }
+        else if(state==='off'){
             consecutiveOff++;
-            detectStatusSpan.textContent = `🔴 无豆状态 (${consecutiveOff})`;
-            if (consecutiveOff >= 2 && lastState === 'on' && autoTriggerCheck.checked && !triggerCooldown) {
+            detectStatusSpan.textContent='🔴 无豆 '+consecutiveOff;
+            if(consecutiveOff>=2 && lastState==='on' && autoTriggerCheck.checked && !triggerCooldown){
                 enemyUseSubstitution();
-                triggerCooldown = true;
-                setTimeout(() => { triggerCooldown = false; }, 2000);
-                consecutiveOff = 0;
+                triggerCooldown=true;
+                setTimeout(()=>{triggerCooldown=false;}, 2000);
+                consecutiveOff=0;
             }
-        } else {
-            consecutiveOff = 0;
-            detectStatusSpan.textContent = '⚪ 未知颜色';
-        }
-        if (state === 'on' || state === 'off') lastState = state;
+        } else { consecutiveOff=0; detectStatusSpan.textContent='⚪ 未知'; }
+        if(state==='on'||state==='off') lastState=state;
     }
 
-    async function startCapture() {
-        try {
-            mediaStream = await navigator.mediaDevices.getDisplayMedia({ video: true });
+    async function startCapture(){
+        try{
+            mediaStream = await navigator.mediaDevices.getDisplayMedia({video:true});
             screenVideo.srcObject = mediaStream;
             startCaptureBtn.classList.add('hidden');
             stopCaptureBtn.classList.remove('hidden');
-            detectStatusSpan.textContent = '⏳ 等待视频...';
-            screenVideo.onloadeddata = () => {
-                detectStatusSpan.textContent = '🔄 已就绪，请采样';
-                if (detectTimer) clearInterval(detectTimer);
-                detectTimer = setInterval(detectFrame, DETECT_INTERVAL);
+            detectStatusSpan.textContent='⏳ 等待视频...';
+            screenVideo.onloadeddata = ()=>{
+                detectStatusSpan.textContent='🔄 就绪';
+                if(detectTimer) clearInterval(detectTimer);
+                detectTimer = setInterval(detectFrame, 200);
             };
-        } catch (err) {
-            alert('屏幕捕获失败: ' + err.message + '\n请使用 HTTPS 或 localhost，并授予权限。');
-        }
+        } catch(e){ alert('捕获失败: '+e.message); }
     }
 
-    function stopCapture() {
-        if (detectTimer) { clearInterval(detectTimer); detectTimer = null; }
-        if (mediaStream) { mediaStream.getTracks().forEach(t => t.stop()); mediaStream = null; }
-        screenVideo.srcObject = null;
+    function stopCapture(){
+        if(detectTimer){ clearInterval(detectTimer); detectTimer=null; }
+        if(mediaStream){ mediaStream.getTracks().forEach(t=>t.stop()); mediaStream=null; }
+        screenVideo.srcObject=null;
         startCaptureBtn.classList.remove('hidden');
         stopCaptureBtn.classList.add('hidden');
-        detectStatusSpan.textContent = '⚪ 已停止';
+        detectStatusSpan.textContent='⚪ 停止';
     }
 
-    sampleOnBtn.addEventListener('click', () => {
+    sampleOnBtn.addEventListener('click', ()=>{
         const avg = captureAverageColor();
-        if (avg) { sampleOnColor = avg; detectStatusSpan.textContent = '🟢 已采样有豆'; autoSave(); }
+        if(avg){ sampleOnColor = avg; detectStatusSpan.textContent='🟢 已采样有豆'; saveSettings(); }
     });
-    sampleOffBtn.addEventListener('click', () => {
+    sampleOffBtn.addEventListener('click', ()=>{
         const avg = captureAverageColor();
-        if (avg) { sampleOffColor = avg; detectStatusSpan.textContent = '⚫ 已采样无豆'; autoSave(); }
+        if(avg){ sampleOffColor = avg; detectStatusSpan.textContent='⚫ 已采样无豆'; saveSettings(); }
     });
     startCaptureBtn.addEventListener('click', startCapture);
     stopCaptureBtn.addEventListener('click', stopCapture);
-    toggleAutoBtn.addEventListener('click', () => {
-        autoPanel.classList.toggle('hidden');
-        toggleAutoBtn.textContent = autoPanel.classList.contains('hidden') ? '⚡ 展开自动检测' : '⚡ 收起自动检测';
-        autoSave();
-    });
-    autoTriggerCheck.addEventListener('change', autoSave);
+    autoTriggerCheck.addEventListener('change', saveSettings);
 
-    // 窗口大小变化防溢出 + 保存
+    // 初始化
+    loadSettings();
+    updateDigitDisplay();
+    applyFontSize();
+    // 默认位置左上角
+    if (!floatContainer.style.left) floatContainer.style.left = '10px';
+    if (!floatContainer.style.top) floatContainer.style.top = '10px';
+
+    // 窗口大小变化防溢出
     window.addEventListener('resize', () => {
-        const r = panel.getBoundingClientRect();
-        if (r.right > window.innerWidth) panel.style.left = Math.max(0, window.innerWidth-panel.offsetWidth)+'px';
-        if (r.bottom > window.innerHeight) panel.style.top = Math.max(0, window.innerHeight-panel.offsetHeight)+'px';
-        autoSave();
+        const rect = floatContainer.getBoundingClientRect();
+        if (rect.right > window.innerWidth) floatContainer.style.left = (window.innerWidth - floatContainer.offsetWidth) + 'px';
+        if (rect.bottom > window.innerHeight) floatContainer.style.top = (window.innerHeight - floatContainer.offsetHeight) + 'px';
+        saveSettings();
     });
-
-    // 初始化加载设置
-    if (!loadSettings()) {
-        // 首次使用默认值
-        updateChakraDisplay();
-        updateTimers();
-        applyFontSize();
-    }
-    // 确保面板在屏幕内
-    const r = panel.getBoundingClientRect();
-    if (r.right > window.innerWidth) panel.style.left = '0px';
-    if (r.bottom > window.innerHeight) panel.style.top = '0px';
-
-    // 首次保存
-    autoSave();
 })();
 </script>
 </body>
